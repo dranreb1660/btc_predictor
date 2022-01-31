@@ -1,12 +1,17 @@
-from Btc_Predictor.btc_predictor.data.prep_n_build_features import Features
+import pandas as pd
+from tqdm import tqdm
+import torch
+from torch.utils.data import Dataset
+
+from btc_predictor.data.prep_and_build_features import Features
 
 
 # Creat sequences, take n sequences and predict the n+1st term
 def create_sequences(data: pd.DataFrame, target_col, seq_length):
     sequences = []
-    data_sz = len(data)
+    data_size = len(data)
 
-    for i in tqdm(range(data_sz - seq_length)):
+    for i in tqdm(range(data_size - seq_length)):
         sequence = data[i:i+seq_length]
         label_pos = i+seq_length
         label = data.iloc[label_pos][target_col]
@@ -14,16 +19,6 @@ def create_sequences(data: pd.DataFrame, target_col, seq_length):
         sequences.append((sequence, label))
 
     return sequences
-
-
-seq_length = 200
-data = Features()  # instantiate data
-tain_data, val_data = data.get_train_val_scaled()
-
-train_sequences = create_sequences(
-    train_data, target_col='close', seq_length=seq_length)
-val_sequences = create_sequences(
-    val_data, target_col='close', seq_length=seq_length)
 
 
 class BTCDataset(Dataset):
@@ -37,6 +32,6 @@ class BTCDataset(Dataset):
     def __getitem__(self, index):
         sequence, label = self.sequences[index]
         return dict(
-            sequence=tensor(sequence),
-            label=tensor(label).float()
+            sequence=torch.tensor(sequence),
+            label=torch.tensor(label).float()
         )

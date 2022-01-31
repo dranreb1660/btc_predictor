@@ -1,3 +1,4 @@
+from torch import nn
 
 
 class PricePredictionModel(nn.Module):
@@ -7,14 +8,14 @@ class PricePredictionModel(nn.Module):
         self.n_hidden = n_hidden
         self.n_layers = n_layers
 
-        self.lstm = LSTM(
+        self.lstm = nn.LSTM(
             input_size=n_features,
             hidden_size=n_hidden,
             batch_first=True,
             num_layers=n_layers,
             dropout=0.2
         )
-        self.regressor = Linear(n_hidden, 1)
+        self.regressor = nn.Linear(n_hidden, 1)
 
     def forward(self, x):
         self.lstm.flatten_parameters()

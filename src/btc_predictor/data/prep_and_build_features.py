@@ -1,4 +1,9 @@
 from fastbook import *
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from sklearn.preprocessing import MinMaxScaler
+
 import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -69,6 +74,8 @@ class Features():
 
         scaled_train_df = self.scale_df(train)
         scaled_val_df = self.scale_df(val)
+        scaled_train_df.to_csv(self.processed_output_path+'scaled_train.csv'),
+        scaled_val_df.to_csv(self.processed_output_path+'scaled_valid.csv')
         return scaled_train_df, scaled_val_df
 
     def scale_df(self, df):

@@ -1,5 +1,9 @@
+import pytorch_lightning as pl
+from torch.utils.data import DataLoader
+import os
 
-from Btc_Predictor.btc_predictor.data.base_dataset import BTCDataset
+from btc_predictor.data.base_dataset import BTCDataset
+
 # wraping the above into a pl datamodule
 
 
