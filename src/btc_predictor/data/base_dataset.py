@@ -8,6 +8,7 @@ from btc_predictor.data.prep_and_build_features import Features
 
 # Creat sequences, take n sequences and predict the n+1st term
 def create_sequences(data: pd.DataFrame, target_col, seq_length):
+    print(f'\n---------Creating sequences of {seq_length}--------\n')
     sequences = []
     data_size = len(data)
 
@@ -17,7 +18,7 @@ def create_sequences(data: pd.DataFrame, target_col, seq_length):
         label = data.iloc[label_pos][target_col]
 
         sequences.append((sequence, label))
-
+    print('\n-------------Sequence creation compleated---------\n')
     return sequences
 
 

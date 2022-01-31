@@ -14,7 +14,7 @@ class BTCPriceDataModule(pl.LightningDataModule):
         self.val_sequences = val_sequences
         self.batch_size = batch_sz
 
-    def setup(self):
+    def setup(self, stage=None):
         self.train_dataset = BTCDataset(self.train_sequences)
         self.val_dataset = BTCDataset(self.val_sequences)
 
@@ -26,12 +26,12 @@ class BTCPriceDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.val_dataset, bs=1,
+            self.val_dataset, batch_sz=1,
             num_workers=1
         )
 
     def test_dataloader(self):
         return DataLoader(
-            self.val_dataset, bs=1,
+            self.val_dataset, batch_sz=1,
             num_workers=1
         )

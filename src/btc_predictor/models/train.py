@@ -1,15 +1,16 @@
-from gc import callbacks
+# from gc import callbacks
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelSummary, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks.progress import TQDMProgressBar
 
 from btc_predictor.data.prep_and_build_features import Features
-import btc_predictor.data.prep_and_build_features as ds
+import btc_predictor.data.base_dataset as ds
 
 from btc_predictor.data.lit_data_model import BTCPriceDataModule
 from btc_predictor.models.lit_model import BTCPricePredictor
 
-base_model_path = '../../..'
+base_model_path = '.'
 
 N_EPOCHS = 12
 BATCH_SIZE = 4096
@@ -32,20 +33,20 @@ def main():
 
     model = BTCPricePredictor(n_features=n_features, lr=0.0001)
     logger = TensorBoardLogger(
-        base_model_path+"logs/lightning_logs", name='btc-price')
+        base_model_path+"/logs/lightning_logs", name='btc-price')
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=base_model_path+'logs/checkpoint',
+        dirpath=base_model_path+'/logs/checkpoint',
         filename='best-checkpoint',
         save_top_k=1,
         verbose=True,
         monitor="val_loss",
         mode="min"
     )
-
-    early_stopping_calback = EarlyStopping(monitor="val_loss", patience=4)
+    progress_bar = TQDMProgressBar(refresh_rate=30)
+    early_stopping_calback = EarlyStopping(monitor="val_loss", patience=5)
     callbacks = [ModelSummary(max_depth=-1),
-                 early_stopping_calback, checkpoint_callback]
+                 early_stopping_calback, checkpoint_callback, progress_bar]
 
     trainer = pl.Trainer(gpus=1,
                          logger=logger,
