@@ -20,18 +20,18 @@ class BTCPriceDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.train_dataset, bs=self.batch_size,
-            shuffle=False, num_workers=os.cpu_count()
+            self.train_dataset, batch_size=self.batch_size,
+            shuffle=False, num_workers=4
         )
 
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset, batch_size=1,
-            num_workers=1
+            num_workers=4
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.val_dataset, batch_size=1,
-            num_workers=1
+            num_workers=4
         )

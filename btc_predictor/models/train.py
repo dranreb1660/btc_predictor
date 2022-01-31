@@ -29,9 +29,9 @@ n_features = train_data.shape[1]
 def main():
 
     data_module = BTCPriceDataModule(train_sequences=train_sequences,
-                                     val_sequences=val_sequences, batch_sz=BATCH_SIZE)
+                                     val_sequences=val_sequences, batch_size=BATCH_SIZE)
 
-    model = BTCPricePredictor(n_features=n_features, lr=0.0001)
+    model = BTCPricePredictor(n_features=n_features, lr=float(0.0001))
     logger = TensorBoardLogger(
         base_model_path+"/logs/lightning_logs", name='btc-price')
 
@@ -52,14 +52,14 @@ def main():
                          logger=logger,
                          callbacks=callbacks,
                          max_epochs=N_EPOCHS,
-                         progress_bar_refresh_rate=30,
-                         auto_lr_find=0.0001,
+                         auto_lr_find=float(0.0001),
                          precision=16
                          )
 
     trainer.tune(model, data_module)
     trainer.fit(model, data_module)
-    trainer.test(model, data)
+    trainer.test(model, data_module, ckpt_path=base_model_path+"/logs/checkpoint/best-checkpoint.ckpt",
+                 )
 
 
 if __name__ == "__main__":

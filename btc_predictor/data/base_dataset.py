@@ -33,6 +33,6 @@ class BTCDataset(Dataset):
     def __getitem__(self, index):
         sequence, label = self.sequences[index]
         return dict(
-            sequence=torch.tensor(sequence),
+            sequence=torch.Tensor(sequence.to_numpy()),
             label=torch.tensor(label).float()
         )
