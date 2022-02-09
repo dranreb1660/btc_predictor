@@ -33,7 +33,8 @@ class Features():
         self.raw_data = download_url(
             self.data_url, dest=Path(self.raw_output_path))
 
-        print('\n')
+        print('')
+        print('raw_data--', self.raw_data)
         return self.raw_data
 
     def build_features(self):
@@ -41,20 +42,16 @@ class Features():
         raw_data_path = str(self._download_data())
         df = pd.read_csv(raw_data_path, parse_dates=[
                          'date'], low_memory=False, header=1)
-
-        # take a small sample for testing code
-        df = df[df.date >= '2021-11-01 02:33:00']
-        df = df.reset_index(drop=True)
-
+        print(df.shape)
         df = df.sort_values(by='date').reset_index(drop=True)  # sort by date
         # shift the target vars by one to get the previos days close
         df['prev_close'] = df.shift(1)['close']
-
+        print(df.shape)
         # creating a new column which will be the closing chng price = close - prev_close
         df['close_change'] = df.progress_apply(
             lambda row: 0 if np.isnan(row.prev_close) else row.close - row.prev_close, axis=1
         )
-
+        print('pp', df.shape)
         # Building and selecting features
         print('\n......Building selected features.........\n')
         rows = []

@@ -22,3 +22,5 @@ class PricePredictionModel(nn.Module):
         _, (hidden, _) = self.lstm(x)
         out = hidden[-1]
         return self.regressor(out)
+
+

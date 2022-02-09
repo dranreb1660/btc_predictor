@@ -49,3 +49,5 @@ class BTCPricePredictor(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.lr)
+
+
