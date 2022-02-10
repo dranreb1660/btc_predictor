@@ -1,8 +1,17 @@
 # from gc import callbacks
+from gettext import install
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelSummary, ModelCheckpoint, EarlyStopping
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
+
+try:
+    import wandb
+    from pytorch_lightning.loggers import WandbLogger
+
+    wandb.login()
+except:
+    print("wandb not installed")
 
 from btc_predictor.data.prep_and_build_features import Features
 import btc_predictor.data.base_dataset as ds
@@ -29,11 +38,14 @@ n_features = train_data.shape[1]
 def main():
 
     data_module = BTCPriceDataModule(train_sequences=train_sequences,
-                                     val_sequences=val_sequences, batch_sz=BATCH_SIZE)
+                                     val_sequences=val_sequences, batch_size=BATCH_SIZE)
 
     model = BTCPricePredictor(n_features=n_features, lr=0.0001)
-    logger = TensorBoardLogger(
+    tb_logger = TensorBoardLogger(
         base_model_path+"/logs/lightning_logs", name='btc-price')
+    wanb_logger = WandbLogger(
+        'btc1', save_dir="lightning_logs", project='btc-multi', )
+    logger = [tb_logger, wanb_logger]
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=base_model_path+'/logs/checkpoint',
