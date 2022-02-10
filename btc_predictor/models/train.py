@@ -21,7 +21,7 @@ from btc_predictor.models.lit_model import BTCPricePredictor
 
 base_model_path = '.'
 
-N_EPOCHS = 12
+N_EPOCHS = 10
 BATCH_SIZE = 4096
 seq_length = 200
 
@@ -31,7 +31,7 @@ train_data, val_data = data.get_train_val_scaled()
 train_sequences = ds.create_sequences(
     train_data, target_col='close', seq_length=seq_length)
 val_sequences = ds.create_sequences(
-    val_data, target_col='close', seq_length=seq_length)
+    val_data, target_col='close', seq_length=seq_length, t_v='Val')
 n_features = train_data.shape[1]
 
 
@@ -44,7 +44,7 @@ def main():
     tb_logger = TensorBoardLogger(
         base_model_path+"/logs/lightning_logs", name='btc-price')
     wanb_logger = WandbLogger(
-        'btc1', save_dir="lightning_logs", project='btc-multi', )
+        'btc1', save_dir=base_model_path+"/logs/lightning_logs", project='btc-multi', )
     logger = [tb_logger, wanb_logger]
 
     checkpoint_callback = ModelCheckpoint(
@@ -64,7 +64,6 @@ def main():
                          logger=logger,
                          callbacks=callbacks,
                          max_epochs=N_EPOCHS,
-                         progress_bar_refresh_rate=30,
                          auto_lr_find=0.0001,
                          precision=16
                          )

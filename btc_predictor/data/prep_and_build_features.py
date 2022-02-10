@@ -44,6 +44,11 @@ class Features():
                          'date'], low_memory=False, header=1)
         print(df.shape)
         df = df.sort_values(by='date').reset_index(drop=True)  # sort by date
+
+        # taking a small sample
+        df = df[df.date >= '2021-12-15 02:33:00']
+        df = df.reset_index(drop=True)
+
         # shift the target vars by one to get the previos days close
         df['prev_close'] = df.shift(1)['close']
         print(df.shape)
