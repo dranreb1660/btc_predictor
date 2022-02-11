@@ -1,10 +1,13 @@
+from tqdm import tqdm
+import numpy as np
+import pandas as pd
+from fastbook import *
 import ssl
 import os
 from sklearn.preprocessing import MinMaxScaler
-from fastbook import *
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
+
+import time
+start = time.time()
 tqdm.pandas()
 
 
@@ -25,7 +28,8 @@ class Features():
         self.processed_output_path = os.path.join(
             str(base_path) + '/data/processed/')
         self.scaler = None
-        self.train_df, self.val_df = None, None
+        self.df = None
+        self.train_size = None
 
     def _download_data(self):
         """download data from given url with fatsai download_url method"""
@@ -46,7 +50,7 @@ class Features():
         df = df.sort_values(by='date').reset_index(drop=True)  # sort by date
 
         # taking a small sample
-        df = df[df.date >= '2021-12-15 02:33:00']
+        df = df[df.date >= '2021-12-30 23:33:00']
         df = df.reset_index(drop=True)
 
         # shift the target vars by one to get the previos days close
@@ -61,6 +65,7 @@ class Features():
         print('\n......Building selected features.........\n')
         rows = []
         ks = []
+        self.df = df
         for k, row in tqdm(df.iterrows(), total=df.shape[0]):
             row_data = dict(
                 day_of_week=row.date.dayofweek,
@@ -85,6 +90,7 @@ class Features():
         train_size = int(len(feats) * train_ratio)
         self.train_df, self.val_df = self.features_df[:
                                                       train_size], self.features_df[train_size:]
+        self.train_size = train_size
         return self.train_df, self.val_df
 
     def get_train_val_scaled(self, scaler=MinMaxScaler(feature_range=(-1, 1))):
@@ -102,5 +108,4 @@ class Features():
         df = pd.DataFrame(self.scaler.transform(df),
                           index=df.index,
                           columns=df.columns)
-
         return df

@@ -1,25 +1,28 @@
+import time
+from btc_predictor.models.train import *
+from btc_predictor.data.base_dataset import BTCDataset
+from btc_predictor.models.lit_model import BTCPricePredictor
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
-from tqdm import tqdm
+import matplotlib.dates as dates
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-from btc_predictor.models.lit_model import BTCPricePredictor
-from btc_predictor.data.base_dataset import BTCDataset
-from btc_predictor.models.train import *
 
 scaler = data.scaler
 de_scaler = MinMaxScaler()
 
 
 def descale(de_scaler, values):
-    values_2d = np.arrar(values)[:, np.newaxis]
+    values_2d = np.array(values)[:, np.newaxis]
     return de_scaler.inverse_transform(values_2d).flatten()
 
 
-trained_model = BTCPricePredictor.load_from_checkpoint()
+trained_model = BTCPricePredictor.load_from_checkpoint(
+    './logs/checkpoint/best-checkpoint.ckpt')
 trained_model.lr
 
-
+trained_model.freeze()
 trained_model.eval()
 test_dataset = BTCDataset(val_sequences)
 predictions = []
@@ -43,10 +46,12 @@ descaled_labels = descale(de_scaler, labels)
 test_df = data.df[data.train_size:]
 test_seq_df = test_df[seq_length:]
 
-dates = plt.dates.date2num(test_seq_df.date.tolist())
+dates = dates.date2num(test_seq_df.date.tolist())
 
 plt.plot_date(dates, descaled_preds, '-', label='predicted')
 plt.plot_date(dates, descaled_labels, '-', label='gound_truth')
 plt.xticks(rotation=45)
 plt.legend()
 plt.savefig('figure.png')
+end = time.time()
+print('Time os: ', end-start)
