@@ -18,8 +18,8 @@ Predict clossing price of bitcoin using historic data
     ├── models                          <- Trained and serialized models, model predictions, or model summaries
     │
     ├── notebooks                       <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                              the creator's initials, and a short `-` delimited description, e.g.
-    │                              `1.0-sa-initial-data-exploration`.
+    │                                   the creator's initials, and a short `-` delimited description, e.g.
+    │                                   `1.0-sa-initial-data-exploration`.
     ├──Pipfile & Pipfile.lock           <- acts a recquirements.txt for pipenv environment
     |
     ├── references                      <- Data dictionaries, manuals, and all other explanatory materials.

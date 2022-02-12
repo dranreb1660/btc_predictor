@@ -1,5 +1,5 @@
 import time
-from btc_predictor.models.train import *
+from btc_predictor.train import *
 from btc_predictor.data.base_dataset import BTCDataset
 from btc_predictor.models.lit_model import BTCPricePredictor
 from sklearn.preprocessing import MinMaxScaler
@@ -19,7 +19,7 @@ def descale(de_scaler, values):
 
 
 trained_model = BTCPricePredictor.load_from_checkpoint(
-    './logs/checkpoint/best-checkpoint.ckpt')
+    './logs/checkpoint/best-checkpoint-v1.ckpt')
 trained_model.lr
 
 trained_model.freeze()
@@ -52,6 +52,6 @@ plt.plot_date(dates, descaled_preds, '-', label='predicted')
 plt.plot_date(dates, descaled_labels, '-', label='gound_truth')
 plt.xticks(rotation=45)
 plt.legend()
-plt.savefig('figure.png')
+plt.savefig('./reports/figures/output.png')
 end = time.time()
-print('Time os: ', end-start)
+print('Time: ', end-start)

@@ -1,0 +1,641 @@
+diff --git a/MANIFEST.in b/MANIFEST.in
+old mode 100755
+new mode 100644
+diff --git a/README.md b/README.md
+old mode 100755
+new mode 100644
+index d3f99f0..d214de8
+--- a/README.md
++++ b/README.md
+@@ -18,8 +18,8 @@ Predict clossing price of bitcoin using historic data
+     ├── models                          <- Trained and serialized models, model predictions, or model summaries
+     │
+     ├── notebooks                       <- Jupyter notebooks. Naming convention is a number (for ordering),
+-    │                              the creator's initials, and a short `-` delimited description, e.g.
+-    │                              `1.0-sa-initial-data-exploration`.
++    │                                   the creator's initials, and a short `-` delimited description, e.g.
++    │                                   `1.0-sa-initial-data-exploration`.
+     ├──Pipfile & Pipfile.lock           <- acts a recquirements.txt for pipenv environment
+     |
+     ├── references                      <- Data dictionaries, manuals, and all other explanatory materials.
+diff --git a/api.py b/api.py
+old mode 100755
+new mode 100644
+diff --git a/btc_predictor/config.py b/btc_predictor/config.py
+old mode 100755
+new mode 100644
+diff --git a/btc_predictor/data/base_dataset.py b/btc_predictor/data/base_dataset.py
+old mode 100755
+new mode 100644
+index 842b3e1..69f5a6b
+--- a/btc_predictor/data/base_dataset.py
++++ b/btc_predictor/data/base_dataset.py
+@@ -12,7 +12,7 @@ def create_sequences(data: pd.DataFrame, target_col, seq_length, t_v='Train'):
+     print(f'\n---------Creating {t_v} sequences of {seq_length}--------\n')
+     sequences = []
+     data_size = len(data)
+-
++    print(target_col)
+     for i in tqdm(range(data_size - seq_length)):
+         sequence = data[i:i+seq_length]
+         label_pos = i+seq_length
+diff --git a/btc_predictor/data/prep_and_build_features.py b/btc_predictor/data/prep_and_build_features.py
+old mode 100755
+new mode 100644
+index febb40e..7eb541d
+--- a/btc_predictor/data/prep_and_build_features.py
++++ b/btc_predictor/data/prep_and_build_features.py
+@@ -6,8 +6,6 @@ import ssl
+ import os
+ from sklearn.preprocessing import MinMaxScaler
+ 
+-import time
+-start = time.time()
+ tqdm.pandas()
+ 
+ 
+@@ -50,8 +48,8 @@ class Features():
+         df = df.sort_values(by='date').reset_index(drop=True)  # sort by date
+ 
+         # taking a small sample
+-        df = df[df.date >= '2021-12-30 23:33:00']
+-        df = df.reset_index(drop=True)
++        # df = df[df.date >= '2021-12-31 23:59:00']
++        # df = df.reset_index(drop=True)
+ 
+         # shift the target vars by one to get the previos days close
+         df['prev_close'] = df.shift(1)['close']
+diff --git a/btc_predictor/features/.gitkeep b/btc_predictor/features/.gitkeep
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/btc_predictor/features/__init__.py b/btc_predictor/features/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/btc_predictor/models/base_model.py b/btc_predictor/models/base_model.py
+old mode 100755
+new mode 100644
+diff --git a/btc_predictor/models/lit_model.py b/btc_predictor/models/lit_model.py
+old mode 100755
+new mode 100644
+index 23750bc..aec81b5
+--- a/btc_predictor/models/lit_model.py
++++ b/btc_predictor/models/lit_model.py
+@@ -1,16 +1,25 @@
++from turtle import pd
+ import pytorch_lightning as pl
+ import torch
+ from torch import nn
++import pandas as pd
++import wandb
+ 
+ from btc_predictor.models.base_model import PricePredictionModel
+ 
+ # creating a lightning module
+ 
++# wandb.init()
++
+ 
+ class BTCPricePredictor(pl.LightningModule):
+-    def __init__(self, n_features: int, lr) -> None:
++    def __init__(self, n_features: int, n_hidden: int, batch_size, seq_length, lr) -> None:
+         super().__init__()
+-        self.model = PricePredictionModel(n_features)
++        self.n_features = n_features
++        self.n_hidden = n_hidden
++        self.batch_size = batch_size
++        self.seq_length = seq_length
++        self.model = PricePredictionModel(self.n_features, self.n_hidden)
+         self.lr = lr
+         self.criterion = nn.MSELoss()
+         self.save_hyperparameters()
+@@ -36,8 +45,8 @@ class BTCPricePredictor(pl.LightningModule):
+         labels = batch['label']
+         loss, outputs = self(sequences, labels)
+         self.log('val_loss', loss, prog_bar=True,
+-                 logger=True, on_step=True, on_epoch=True)
+-        return loss
++                 logger=True, on_step=False, on_epoch=True)
++        return outputs
+ 
+     def test_step(self, batch, batch_idx):
+         sequences = batch['sequence']
+@@ -45,9 +54,54 @@ class BTCPricePredictor(pl.LightningModule):
+         loss, outputs = self(sequences, labels)
+         self.log('test_loss', loss, prog_bar=True,
+                  logger=True, on_step=True, on_epoch=True)
+-        return loss
++        return outputs
++
++    def validation_epoch_end(self, validation_step_outputs):
++        dummyImput = torch.zeros(
++            (1, self.seq_length, self.n_features), device=self.device)
++        model_filename = f'model_{str(self.current_epoch)}.onnx'
++        # torch.onnx.export(self, dummyImput, model_filename)
++        # wandb.save(model_filename)
++
++        flattened_outputs = torch.flatten(
++            torch.cat(validation_step_outputs))
++        self.logger.experiment.log(
++            {'valid/logits': wandb.Histogram(flattened_outputs.to('cpu')),
++             'epoch': self.current_epoch}
++        )
++
++    def test_epoch_end(self, test_step_outputs):
++        dummyImput = torch.zeros(
++            (self.batch_size, self.seq_length, self.n_features), device=self.device)
++        model_filename = f'model_final.onnx'
++        # torch.onnx.export(self, dummyImput, model_filename)
++        # wandb.save(model_filename)
+ 
+     def configure_optimizers(self):
+         return torch.optim.AdamW(self.parameters(), lr=self.lr)
+ 
+ 
++class BTCRegressorLogger(pl.Callback):
++    def __init__(self, val_samples, num_samples=32) -> None:
++        super().__init__()
++        self.val_seqs = val_samples['sequence']
++        self.val_labels = val_samples['label']
++        self.val_seqs = self.val_seqs[:num_samples]
++        self.val_labels = self.val_labels[:num_samples]
++
++    def on_validation_epoch_end(self, trainer, pl_module):
++        val_seqs = self.val_seqs.to(device=pl_module.device)
++
++        logits = pl_module(val_seqs)
++
++        df = pd.DataFrame(self.val_seqs.squeeze())
++        print([logits[1].item()])
++
++        df['preds'] = [logits[1].item()]*len(df)
++        df['truth'] = [self.val_labels]*len(df)
++        data = df.values
++
++        trainer.logger.experiment.log({
++            'examples': wandb.Table(data=data,
++                                    columns=['day_of_week', 'day_of_month', 'week_of_year', 'month', 'open', 'high', 'low', 'close_change', 'close', 'preds', 'price'])
++        })
+diff --git a/btc_predictor/predict.py b/btc_predictor/predict.py
+old mode 100755
+new mode 100644
+index 2f0ce67..5283c73
+--- a/btc_predictor/predict.py
++++ b/btc_predictor/predict.py
+@@ -1,5 +1,5 @@
+ import time
+-from btc_predictor.models.train import *
++from btc_predictor.train import *
+ from btc_predictor.data.base_dataset import BTCDataset
+ from btc_predictor.models.lit_model import BTCPricePredictor
+ from sklearn.preprocessing import MinMaxScaler
+@@ -52,6 +52,6 @@ plt.plot_date(dates, descaled_preds, '-', label='predicted')
+ plt.plot_date(dates, descaled_labels, '-', label='gound_truth')
+ plt.xticks(rotation=45)
+ plt.legend()
+-plt.savefig('figure.png')
++plt.savefig('./reports/figures/output.png')
+ end = time.time()
+-print('Time os: ', end-start)
++print('Time: ', end-start)
+diff --git a/btc_predictor/response_handler.py b/btc_predictor/response_handler.py
+old mode 100755
+new mode 100644
+diff --git a/btc_predictor/train.py b/btc_predictor/train.py
+old mode 100755
+new mode 100644
+index 3b8deef..796d7d1
+--- a/btc_predictor/train.py
++++ b/btc_predictor/train.py
+@@ -1,7 +1,7 @@
+ # from gc import callbacks
+-from gettext import install
++
+ import pytorch_lightning as pl
+-from pytorch_lightning.callbacks import ModelSummary, ModelCheckpoint, EarlyStopping
++from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+ from pytorch_lightning.callbacks.progress import TQDMProgressBar
+ import time
+@@ -18,13 +18,14 @@ from btc_predictor.data.prep_and_build_features import Features
+ import btc_predictor.data.base_dataset as ds
+ 
+ from btc_predictor.data.lit_data_model import BTCPriceDataModule
+-from btc_predictor.models.lit_model import BTCPricePredictor
++from btc_predictor.models.lit_model import BTCPricePredictor, BTCRegressorLogger
+ start = time.time()
+ base_model_path = '.'
+ 
+-N_EPOCHS = 2
++N_EPOCHS = 15
+ BATCH_SIZE = 4096
+ seq_length = 200
++n_hidden = 128
+ 
+ data = Features()  # instantiate data
+ train_data, val_data = data.get_train_val_scaled()
+@@ -40,13 +41,16 @@ def train():
+ 
+     data_module = BTCPriceDataModule(train_sequences=train_sequences,
+                                      val_sequences=val_sequences, batch_size=BATCH_SIZE)
++    data_module.setup()
++    samples = next(iter(data_module.val_dataloader()))
+ 
+-    model = BTCPricePredictor(n_features=n_features, lr=0.0001)
++    model = BTCPricePredictor(n_features=n_features, n_hidden=n_hidden,
++                              batch_size=BATCH_SIZE, seq_length=seq_length, lr=0.0001)
+     tb_logger = TensorBoardLogger(
+         base_model_path+"/logs/lightning_logs", name='btc-price')
+     wanb_logger = WandbLogger(
+         'btc1', save_dir=base_model_path+"/logs/lightning_logs", project='btc-multi', )
+-    logger = [tb_logger, wanb_logger]
++    logger = wanb_logger
+ 
+     checkpoint_callback = ModelCheckpoint(
+         dirpath=base_model_path+'/logs/checkpoint',
+@@ -58,7 +62,7 @@ def train():
+     )
+     progress_bar = TQDMProgressBar(refresh_rate=30)
+     early_stopping_calback = EarlyStopping(monitor="val_loss", patience=5)
+-    callbacks = [ModelSummary(max_depth=-1),
++    callbacks = [BTCRegressorLogger(samples),
+                  early_stopping_calback, checkpoint_callback, progress_bar]
+ 
+     trainer = pl.Trainer(gpus=1,
+diff --git a/btc_predictor/visualization/.gitkeep b/btc_predictor/visualization/.gitkeep
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/btc_predictor/visualization/__init__.py b/btc_predictor/visualization/__init__.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/btc_predictor/visualization/visualize.py b/btc_predictor/visualization/visualize.py
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/docs/Makefile b/docs/Makefile
+old mode 100755
+new mode 100644
+diff --git a/docs/commands.rst b/docs/commands.rst
+old mode 100755
+new mode 100644
+diff --git a/docs/conf.py b/docs/conf.py
+old mode 100755
+new mode 100644
+diff --git a/docs/getting-started.rst b/docs/getting-started.rst
+old mode 100755
+new mode 100644
+diff --git a/docs/index.rst b/docs/index.rst
+old mode 100755
+new mode 100644
+diff --git a/docs/make.bat b/docs/make.bat
+old mode 100755
+new mode 100644
+diff --git a/logs/checkpoint/best-checkpoint.ckpt b/logs/checkpoint/best-checkpoint.ckpt
+index 76437e9..1e7c092 100644
+Binary files a/logs/checkpoint/best-checkpoint.ckpt and b/logs/checkpoint/best-checkpoint.ckpt differ
+diff --git a/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644518757.5baf3df75c1c.5589.0 b/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644518757.5baf3df75c1c.5589.0
+deleted file mode 100644
+index 0f83778..0000000
+Binary files a/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644518757.5baf3df75c1c.5589.0 and /dev/null differ
+diff --git a/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644520005.5baf3df75c1c.5589.1 b/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644520005.5baf3df75c1c.5589.1
+deleted file mode 100644
+index 88cc570..0000000
+Binary files a/logs/lightning_logs/btc-price/version_0/events.out.tfevents.1644520005.5baf3df75c1c.5589.1 and /dev/null differ
+diff --git a/logs/lightning_logs/btc-price/version_0/hparams.yaml b/logs/lightning_logs/btc-price/version_0/hparams.yaml
+deleted file mode 100644
+index 00ec01a..0000000
+--- a/logs/lightning_logs/btc-price/version_0/hparams.yaml
++++ /dev/null
+@@ -1,2 +0,0 @@
+-lr: 0.0001
+-n_features: 9
+diff --git a/logs/lightning_logs/wandb/latest-run b/logs/lightning_logs/wandb/latest-run
+deleted file mode 100644
+index 87e2369..0000000
+--- a/logs/lightning_logs/wandb/latest-run
++++ /dev/null
+@@ -1 +0,0 @@
+-run-20220210_184557-2z5i8rhc
+\ No newline at end of file
+diff --git a/logs/lightning_logs/wandb/latest-run b/logs/lightning_logs/wandb/latest-run
+new file mode 120000
+index 0000000..eca908a
+--- /dev/null
++++ b/logs/lightning_logs/wandb/latest-run
+@@ -0,0 +1 @@
++run-20220212_130427-1j58hq1e
+\ No newline at end of file
+diff --git a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/config.yaml b/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/config.yaml
+deleted file mode 100644
+index f5176cf..0000000
+--- a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/config.yaml
++++ /dev/null
+@@ -1,59 +0,0 @@
+-wandb_version: 1
+-
+-_wandb:
+-  desc: null
+-  value:
+-    cli_version: 0.12.10
+-    framework: lightning
+-    is_jupyter_run: false
+-    is_kaggle_kernel: false
+-    m:
+-    - 1: trainer/global_step
+-      6:
+-      - 3
+-    - 1: val_loss_step
+-      5: 1
+-      6:
+-      - 1
+-    - 1: val_loss_epoch
+-      5: 1
+-      6:
+-      - 1
+-    - 1: epoch
+-      5: 1
+-      6:
+-      - 1
+-    - 1: train_loss_epoch
+-      5: 1
+-      6:
+-      - 1
+-    - 1: train_loss_step
+-      5: 1
+-      6:
+-      - 1
+-    python_version: 3.7.12
+-    start_time: 1644518757
+-    t:
+-      1:
+-      - 1
+-      - 4
+-      - 5
+-      - 9
+-      2:
+-      - 1
+-      - 4
+-      - 5
+-      - 9
+-      3:
+-      - 7
+-      - 13
+-      4: 3.7.12
+-      5: 0.12.10
+-      8:
+-      - 5
+-lr:
+-  desc: null
+-  value: 0.0001
+-n_features:
+-  desc: null
+-  value: 9
+diff --git a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/requirements.txt b/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/requirements.txt
+deleted file mode 100644
+index af2414c..0000000
+--- a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/requirements.txt
++++ /dev/null
+@@ -1,166 +0,0 @@
+-absl-py==1.0.0
+-aiohttp==3.8.1
+-aiosignal==1.2.0
+-argon2-cffi-bindings==21.2.0
+-argon2-cffi==21.3.0
+-async-timeout==4.0.2
+-asynctest==0.13.0
+-attrs==21.4.0
+-backcall==0.2.0
+-bleach==4.1.0
+-blis==0.7.5
+-cachetools==5.0.0
+-catalogue==2.0.6
+-certifi==2021.10.8
+-cffi==1.15.0
+-charset-normalizer==2.0.11
+-click==8.0.3
+-colour==0.1.5
+-cycler==0.11.0
+-cymem==2.0.6
+-debugpy==1.5.1
+-decorator==5.1.1
+-defusedxml==0.7.1
+-docker-pycreds==0.4.0
+-dtreeviz==1.3.3
+-entrypoints==0.4
+-fastai==2.5.3
+-fastbook==0.0.18
+-fastcore==1.3.27
+-fastdownload==0.0.5
+-fastprogress==1.0.0
+-fastrelease==0.1.12
+-fonttools==4.29.1
+-frozenlist==1.3.0
+-fsspec==2022.1.0
+-future==0.18.2
+-ghapi==0.1.19
+-gitdb==4.0.9
+-gitpython==3.1.26
+-google-auth-oauthlib==0.4.6
+-google-auth==2.6.0
+-graphviz==0.19.1
+-grpcio==1.43.0
+-idna==3.3
+-importlib-metadata==4.10.1
+-importlib-resources==5.4.0
+-iniconfig==1.1.1
+-ipykernel==6.9.0
+-ipython-genutils==0.2.0
+-ipython==7.31.1
+-ipywidgets==7.6.5
+-jedi==0.18.1
+-jinja2==3.0.3
+-joblib==1.1.0
+-jsonschema==4.4.0
+-jupyter-client==6.1.12
+-jupyter-console==6.4.0
+-jupyter-core==4.9.1
+-jupyter==1.0.0
+-jupyterlab-widgets==1.0.2
+-kaggle==1.5.12
+-kiwisolver==1.3.2
+-langcodes==3.3.0
+-markdown==3.3.6
+-markupsafe==2.0.1
+-matplotlib-inline==0.1.3
+-matplotlib==3.5.1
+-mistune==0.8.4
+-multidict==6.0.2
+-murmurhash==1.0.6
+-nbconvert==5.6.1
+-nbdev==1.1.23
+-nbformat==5.1.3
+-nest-asyncio==1.5.4
+-notebook==6.4.8
+-numpy==1.21.5
+-oauthlib==3.2.0
+-packaging==21.3
+-pandas==1.3.5
+-pandocfilters==1.5.0
+-parso==0.8.3
+-pathtools==0.1.2
+-pathy==0.6.1
+-pexpect==4.8.0
+-pickleshare==0.7.5
+-pillow==9.0.1
+-pip==22.0.3
+-pluggy==1.0.0
+-preshed==3.0.6
+-prometheus-client==0.13.1
+-promise==2.3
+-prompt-toolkit==3.0.27
+-protobuf==3.19.4
+-psutil==5.9.0
+-ptyprocess==0.7.0
+-py==1.11.0
+-pyasn1-modules==0.2.8
+-pyasn1==0.4.8
+-pycparser==2.21
+-pydantic==1.8.2
+-pydeprecate==0.3.1
+-pygments==2.11.2
+-pyparsing==3.0.7
+-pyrsistent==0.18.1
+-pytest==7.0.0
+-python-dateutil==2.8.2
+-python-slugify==5.0.2
+-pytorch-lightning==1.5.10
+-pytz==2021.3
+-pyyaml==6.0
+-pyzmq==22.3.0
+-qtconsole==5.2.2
+-qtpy==2.0.1
+-requests-oauthlib==1.3.1
+-requests==2.27.1
+-rsa==4.8
+-scikit-learn==1.0.2
+-scipy==1.7.3
+-seaborn==0.11.2
+-send2trash==1.8.0
+-sentencepiece==0.1.96
+-sentry-sdk==1.5.4
+-setuptools==59.5.0
+-shortuuid==1.0.8
+-six==1.16.0
+-smart-open==5.2.1
+-smmap==5.0.0
+-spacy-legacy==3.0.8
+-spacy-loggers==1.0.1
+-spacy==3.2.1
+-srsly==2.4.2
+-svgwrite==1.4.1
+-tensorboard-data-server==0.6.1
+-tensorboard-plugin-wit==1.8.1
+-tensorboard==2.8.0
+-termcolor==1.1.0
+-terminado==0.13.1
+-testpath==0.5.0
+-text-unidecode==1.3
+-theano==1.0.5
+-thinc==8.0.13
+-threadpoolctl==3.1.0
+-tomli==2.0.1
+-torch==1.10.2+cu113
+-torchaudio==0.10.2+cu113
+-torchmetrics==0.7.2
+-torchvision==0.11.3+cu113
+-tornado==6.1
+-tqdm==4.62.3
+-traitlets==5.1.1
+-tree==0.2.4
+-treeinterpreter==0.2.3
+-typer==0.4.0
+-typing-extensions==3.10.0.2
+-urllib3==1.26.8
+-wandb==0.12.10
+-wasabi==0.9.0
+-waterfallcharts==3.8
+-wcwidth==0.2.5
+-webencodings==0.5.1
+-werkzeug==2.0.3
+-wheel==0.37.1
+-widgetsnbextension==3.5.2
+-yarl==1.7.2
+-yaspin==2.1.0
+-zipp==3.7.0
+\ No newline at end of file
+diff --git a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-metadata.json b/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-metadata.json
+deleted file mode 100644
+index aa583a2..0000000
+--- a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-metadata.json
++++ /dev/null
+@@ -1,24 +0,0 @@
+-{
+-    "os": "Linux-5.4.144+-x86_64-with-Ubuntu-18.04-bionic",
+-    "python": "3.7.12",
+-    "heartbeatAt": "2022-02-10T18:46:02.104392",
+-    "startedAt": "2022-02-10T18:45:57.196123",
+-    "docker": null,
+-    "gpu": "Tesla P100-PCIE-16GB",
+-    "gpu_count": 1,
+-    "cpu_count": 4,
+-    "cuda": null,
+-    "args": [],
+-    "state": "running",
+-    "program": "btc_predictor/models/train.py",
+-    "codePath": "btc_predictor/models/train.py",
+-    "git": {
+-        "remote": "https://github.com/dranreb1660/btc_predictor.git",
+-        "commit": "c47320c514e66bf4213c059065da8065b63247ce"
+-    },
+-    "email": null,
+-    "root": "/content/drive/Othercomputers/my_mac/Coding_stuff/Projects/Btc_Predictor",
+-    "host": "5baf3df75c1c",
+-    "username": "root",
+-    "executable": "/root/.local/share/virtualenvs/Btc_Predictor-RuTPyatu/bin/python"
+-}
+diff --git a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-summary.json b/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-summary.json
+deleted file mode 100644
+index 51dede5..0000000
+--- a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/files/wandb-summary.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{"val_loss_step": 0.052086781710386276, "trainer/global_step": 179, "_runtime": 1248, "_timestamp": 1644520005, "_step": 80112, "val_loss_epoch": 0.025007355958223343, "epoch": 9, "train_loss_epoch": 0.27179473638534546, "train_loss_step": 0.29394814372062683, "_wandb": {"runtime": 1245}}
+\ No newline at end of file
+diff --git a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/run-2z5i8rhc.wandb b/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/run-2z5i8rhc.wandb
+deleted file mode 100644
+index 3cdd0c6..0000000
+Binary files a/logs/lightning_logs/wandb/run-20220210_184557-2z5i8rhc/run-2z5i8rhc.wandb and /dev/null differ
+diff --git a/requirements.txt b/requirements.txt
+old mode 100755
+new mode 100644
+diff --git a/setup.py b/setup.py
+old mode 100755
+new mode 100644
+diff --git a/source b/source
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/tests/load_testing.py b/tests/load_testing.py
+old mode 100755
+new mode 100644
+diff --git a/tests/perf_testing.py b/tests/perf_testing.py
+old mode 100755
+new mode 100644
+diff --git a/tests/pytest_utils.py b/tests/pytest_utils.py
+old mode 100755
+new mode 100644
+diff --git a/tests/test_btc_predictor.py b/tests/test_btc_predictor.py
+old mode 100755
+new mode 100644
+diff --git a/tests/test_edge_cases.py b/tests/test_edge_cases.py
+old mode 100755
+new mode 100644
+diff --git a/tests/test_exception_handling.py b/tests/test_exception_handling.py
+old mode 100755
+new mode 100644
+diff --git a/tests/test_schema.py b/tests/test_schema.py
+old mode 100755
+new mode 100644
+diff --git a/waitress_server.py b/waitress_server.py
+old mode 100755
+new mode 100644
+diff --git a/wsgi.py b/wsgi.py
+old mode 100755
+new mode 100644

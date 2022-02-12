@@ -12,7 +12,7 @@ def create_sequences(data: pd.DataFrame, target_col, seq_length, t_v='Train'):
     print(f'\n---------Creating {t_v} sequences of {seq_length}--------\n')
     sequences = []
     data_size = len(data)
-
+    print(target_col)
     for i in tqdm(range(data_size - seq_length)):
         sequence = data[i:i+seq_length]
         label_pos = i+seq_length

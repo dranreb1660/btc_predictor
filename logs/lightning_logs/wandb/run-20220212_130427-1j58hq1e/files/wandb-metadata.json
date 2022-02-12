@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.4.144+-x86_64-with-Ubuntu-18.04-bionic",
+    "python": "3.7.12",
+    "heartbeatAt": "2022-02-12T13:04:29.411683",
+    "startedAt": "2022-02-12T13:04:27.882376",
+    "docker": null,
+    "gpu": "Tesla P100-PCIE-16GB",
+    "gpu_count": 1,
+    "cpu_count": 4,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "btc_predictor/train.py",
+    "codePath": "btc_predictor/train.py",
+    "git": {
+        "remote": "https://github.com/dranreb1660/btc_predictor.git",
+        "commit": "81fabbb6d9afe79bd5ed4eed747e83bc998870b2"
+    },
+    "email": null,
+    "root": "/content/drive/Othercomputers/my_mac/Coding_stuff/Projects/Btc_Predictor",
+    "host": "3a272f0b727d",
+    "username": "root",
+    "executable": "/root/.local/share/virtualenvs/Btc_Predictor-RuTPyatu/bin/python"
+}

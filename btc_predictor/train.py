@@ -1,7 +1,7 @@
 # from gc import callbacks
-from gettext import install
+
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelSummary, ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 import time
@@ -18,13 +18,14 @@ from btc_predictor.data.prep_and_build_features import Features
 import btc_predictor.data.base_dataset as ds
 
 from btc_predictor.data.lit_data_model import BTCPriceDataModule
-from btc_predictor.models.lit_model import BTCPricePredictor
+from btc_predictor.models.lit_model import BTCPricePredictor, BTCRegressorLogger
 start = time.time()
 base_model_path = '.'
 
-N_EPOCHS = 2
+N_EPOCHS = 15
 BATCH_SIZE = 4096
 seq_length = 200
+n_hidden = 128
 
 data = Features()  # instantiate data
 train_data, val_data = data.get_train_val_scaled()
@@ -40,13 +41,16 @@ def train():
 
     data_module = BTCPriceDataModule(train_sequences=train_sequences,
                                      val_sequences=val_sequences, batch_size=BATCH_SIZE)
+    data_module.setup()
+    samples = next(iter(data_module.val_dataloader()))
 
-    model = BTCPricePredictor(n_features=n_features, lr=0.0001)
+    model = BTCPricePredictor(n_features=n_features, n_hidden=n_hidden,
+                              batch_size=BATCH_SIZE, seq_length=seq_length, lr=0.0001)
     tb_logger = TensorBoardLogger(
         base_model_path+"/logs/lightning_logs", name='btc-price')
     wanb_logger = WandbLogger(
         'btc1', save_dir=base_model_path+"/logs/lightning_logs", project='btc-multi', )
-    logger = [tb_logger, wanb_logger]
+    logger = wanb_logger
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=base_model_path+'/logs/checkpoint',
@@ -58,7 +62,7 @@ def train():
     )
     progress_bar = TQDMProgressBar(refresh_rate=30)
     early_stopping_calback = EarlyStopping(monitor="val_loss", patience=5)
-    callbacks = [ModelSummary(max_depth=-1),
+    callbacks = [BTCRegressorLogger(samples),
                  early_stopping_calback, checkpoint_callback, progress_bar]
 
     trainer = pl.Trainer(gpus=1,
